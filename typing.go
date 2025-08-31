@@ -2,28 +2,29 @@ package main
 
 import (
 	"context"
-	"slices"
 	"time"
+
+	"github.com/go-telegram/bot/models"
 )
 
 type TypingChange struct {
 	ChatID    int64
 	MessageID int
-	IsTyping  bool
+	Action    models.ChatAction
 }
 
 type typingHandlerType struct {
 	ch        chan TypingChange
-	typingIDs map[int]int64 // map[MessageID]ChatID
+	typingIDs map[int]TypingChange // map[MessageID]TypingChange
 }
 
 var typingHandler typingHandlerType
 
-func (t *typingHandlerType) ChangeTypingStatus(chatID int64, messageID int, isTyping bool) {
+func (t *typingHandlerType) ChangeTypingStatus(chatID int64, messageID int, action models.ChatAction) {
 	t.ch <- TypingChange{
 		ChatID:    chatID,
 		MessageID: messageID,
-		IsTyping:  isTyping,
+		Action:    action,
 	}
 }
 
@@ -33,23 +34,32 @@ func (t *typingHandlerType) Process(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case typingChange := <-t.ch:
-			if typingChange.IsTyping {
-				if _, exists := t.typingIDs[typingChange.MessageID]; !exists {
-					t.typingIDs[typingChange.MessageID] = typingChange.ChatID
-					sendChatActionTyping(ctx, typingChange.ChatID)
+			delete(t.typingIDs, typingChange.MessageID)
+
+			if typingChange.Action != "" {
+				t.typingIDs[typingChange.MessageID] = TypingChange{
+					ChatID:    typingChange.ChatID,
+					MessageID: typingChange.MessageID,
+					Action:    typingChange.Action,
 				}
-			} else {
-				delete(t.typingIDs, typingChange.MessageID)
+				sendChatAction(ctx, typingChange.ChatID, typingChange.Action)
 			}
 		case <-time.After(4 * time.Second):
-			var sendTypingToChatIDs []int64
-			for _, chatID := range t.typingIDs {
-				if !slices.Contains(sendTypingToChatIDs, chatID) {
-					sendTypingToChatIDs = append(sendTypingToChatIDs, chatID)
+			var sendTypingTo []TypingChange
+			for _, typingChange := range t.typingIDs {
+				alredyInSendTypingTo := false
+				for _, v := range sendTypingTo {
+					if v.ChatID == typingChange.ChatID {
+						alredyInSendTypingTo = true
+						break
+					}
+				}
+				if !alredyInSendTypingTo {
+					sendTypingTo = append(sendTypingTo, typingChange)
 				}
 			}
-			for _, chatID := range sendTypingToChatIDs {
-				sendChatActionTyping(ctx, chatID)
+			for _, typingChange := range sendTypingTo {
+				sendChatAction(ctx, typingChange.ChatID, typingChange.Action)
 			}
 		}
 	}
@@ -57,6 +67,6 @@ func (t *typingHandlerType) Process(ctx context.Context) {
 
 func (c *typingHandlerType) Start(ctx context.Context) {
 	c.ch = make(chan TypingChange)
-	c.typingIDs = make(map[int]int64)
+	c.typingIDs = make(map[int]TypingChange)
 	go c.Process(ctx)
 }

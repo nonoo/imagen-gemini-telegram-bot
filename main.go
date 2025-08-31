@@ -95,13 +95,15 @@ func sendReplyToMessage(ctx context.Context, replyToMsg *models.Message, s strin
 	return
 }
 
-func sendChatActionTyping(ctx context.Context, chatID int64) {
-	action := bot.SendChatActionParams{
+func sendChatAction(ctx context.Context, chatID int64, action models.ChatAction) {
+	params := bot.SendChatActionParams{
 		ChatID: chatID,
-		Action: models.ChatActionTyping,
+		Action: action,
 	}
 
-	_, err := telegramBot.SendChatAction(ctx, &action)
+	fmt.Printf("    sending chat action: %v\n", action)
+
+	_, err := telegramBot.SendChatAction(ctx, &params)
 	if err != nil {
 		fmt.Println("  send chat action error:", err)
 	}

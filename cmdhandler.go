@@ -34,6 +34,11 @@ func (c *cmdHandlerType) reply(ctx context.Context, text string) (replyMsg *mode
 }
 
 func (c *cmdHandlerType) ImagenResultProcess(ctx context.Context, response *genai.GenerateContentResponse, argsPresent []string, n int, prompt string) {
+	typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, models.ChatActionUploadPhoto)
+	defer func() {
+		typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, "")
+	}()
+
 	if response.PromptFeedback != nil {
 		_, _ = c.reply(ctx, errorStr+": "+response.PromptFeedback.BlockReasonMessage)
 		return
@@ -52,11 +57,15 @@ func (c *cmdHandlerType) ImagenResultProcess(ctx context.Context, response *gena
 			_, _ = c.reply(ctx, errorStr+": "+string(candidate.FinishReason))
 			return
 		}
+		fmt.Printf("    candidate %v:\n", candidate)
+		fmt.Printf("    parts: %v:\n", candidate.Content.Parts)
 		for _, part := range candidate.Content.Parts {
 			if part.Text != "" {
 				_, _ = c.reply(ctx, part.Text)
 			} else if part.InlineData != nil {
 				imgs = append(imgs, part.InlineData.Data)
+			} else {
+				fmt.Printf("    no image data found in part %v\n", part)
 			}
 		}
 	}
@@ -91,6 +100,7 @@ func (c *cmdHandlerType) ImagenResultProcess(ctx context.Context, response *gena
 
 	fmt.Println("    uploading images...")
 	_, err := uploadImages(ctx, c.cmdMsg, description, imgs)
+
 	if err != nil {
 		fmt.Println("    upload error:", err)
 		_, _ = c.reply(ctx, errorStr+": "+err.Error())
@@ -155,7 +165,7 @@ func (c *cmdHandlerType) ImagenEdit(ctx context.Context, argsPresent []string, n
 
 	fmt.Println("    got", len(imgs), "images")
 
-	typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, true)
+	typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, models.ChatActionTyping)
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey: params.GeminiAPIKey,
@@ -163,8 +173,6 @@ func (c *cmdHandlerType) ImagenEdit(ctx context.Context, argsPresent []string, n
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, false)
 
 	parts := []*genai.Part{
 		genai.NewPartFromText(prompt),
@@ -191,6 +199,7 @@ func (c *cmdHandlerType) ImagenEdit(ctx context.Context, argsPresent []string, n
 	if err != nil {
 		fmt.Println("    edit error:", err)
 		_, _ = c.reply(ctx, errorStr+": "+err.Error())
+		typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, "")
 		return
 	}
 
@@ -198,7 +207,7 @@ func (c *cmdHandlerType) ImagenEdit(ctx context.Context, argsPresent []string, n
 }
 
 func (c *cmdHandlerType) ImagenGenerate(ctx context.Context, argsPresent []string, n int, prompt string) {
-	typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, true)
+	typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, models.ChatActionTyping)
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey: params.GeminiAPIKey,
@@ -206,8 +215,6 @@ func (c *cmdHandlerType) ImagenGenerate(ctx context.Context, argsPresent []strin
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, false)
 
 	fmt.Println("    sending generate request...")
 	res, err := client.Models.GenerateContent(ctx, modelName, genai.Text(prompt), &genai.GenerateContentConfig{
@@ -217,6 +224,7 @@ func (c *cmdHandlerType) ImagenGenerate(ctx context.Context, argsPresent []strin
 	if err != nil {
 		fmt.Println("    generate error:", err)
 		_, _ = c.reply(ctx, errorStr+": "+err.Error())
+		typingHandler.ChangeTypingStatus(c.cmdMsg.Chat.ID, c.cmdMsg.ID, "")
 		return
 	}
 
