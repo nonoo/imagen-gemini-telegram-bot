@@ -1,6 +1,6 @@
 module github.com/nonoo/imagen-gemini-telegram-bot
 
-go 1.25
+go 1.24.0
 
 require (
 	github.com/go-telegram/bot v1.17.0

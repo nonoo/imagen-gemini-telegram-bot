@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.25 as builder
+FROM docker.io/library/golang:1.24 as builder
 WORKDIR /app/
 COPY go.mod go.sum /app/
 RUN go mod download
