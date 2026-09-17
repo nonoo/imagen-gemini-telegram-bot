@@ -12,7 +12,7 @@ import (
 	"google.golang.org/genai"
 )
 
-var modelName = "gemini-3.1-flash-image-preview"
+var modelName = "gemini-3.1-flash-lite-image"
 
 type ImageFilesDataType struct {
 	Data     []byte
