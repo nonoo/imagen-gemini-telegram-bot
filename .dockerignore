@@ -1,0 +1,9 @@
+.git
+.vscode
+*.code-workspace
+*.sh
+config.inc.sh*
+imagen-gemini-telegram-bot
+Dockerfile
+README.md
+LICENSE

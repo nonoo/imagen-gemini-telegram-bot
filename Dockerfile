@@ -2,7 +2,7 @@ FROM docker.io/library/golang:1.24 as builder
 WORKDIR /app/
 COPY go.mod go.sum /app/
 RUN go mod download
-COPY . .
+COPY *.go /app/
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v
 
 FROM alpine
